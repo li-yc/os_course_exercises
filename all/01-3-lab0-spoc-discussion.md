@@ -17,10 +17,19 @@
 ## 思考题
 
 - 你理解的对于类似ucore这样需要进程/虚存/文件系统的操作系统，在硬件设计上至少需要有哪些直接的支持？至少应该提供哪些功能的特权指令？
+    + 对于进程：应该添加进程间通信的硬件支持，包括防止控制访问冲突的互斥锁、信号量、条件量的指令，以及进程间发送数据的指令。
+    + 对于虚存：应该添加虚拟内存和物理内存转换的硬件支持，应该提供控制TLB的表项的指令。
+    + 对于文件系统：应该添加
 
 - 你理解的x86的实模式和保护模式有什么区别？物理地址、线性地址、逻辑地址的含义分别是什么？
+    + 实模式中程序的使用地址均是物理地址，可访问的物理内存不超过1M；保护模式中程序使用的地址是虚拟地址，需要经过操作系统转换为物理地址，保护模式还支持多任务和多优先级机制。因此实模式中程序更有可能因为访问到了不该访问的地址影响其他程序或者操作系统的运行。
+    + 物理地址是直接用于访问内存和其他外设的地址。线性地址是逻辑地址和物理地址经过段机制转换的中间变量。逻辑地址是程序直接使用的虚拟地址，需要经过转换变成物理地址。
 
-- 你理解的risc-v的特权模式有什么区别？不同 模式在地址访问方面有何特征？
+- 你理解的risc-v的特权模式有什么区别？不同模式在地址访问方面有何特征？
+    + M-mode是机器模式，可以不受限制地访问整个机器，直接使用物理地址。
+    + H-mode用于支持虚拟机监视器。
+    + S-mode是操作系统的工作模式，可以使用物理地址，也可以使用虚拟地址。
+    + U-mode是用户模式，使用虚拟地址。
 
 - 理解ucore中list_entry双向链表数据结构及其4个基本操作函数和ucore中一些基于它的代码实现（此题不用填写内容）
 
@@ -39,6 +48,8 @@
     unsigned gd_off_31_16 : 16;        // high bits of offset in segment
  };
 ```
+
+代表的是相应的变量占多少bit。
 
 - 对于如下的代码段，
 
@@ -63,17 +74,67 @@ SETGATE(intr, 1,2,3,0);
 ```
 请问执行上述指令后， intr的值是多少？
 
+0x20003
+
 ### 课堂实践练习
 
 #### 练习一
 
 1. 请在ucore中找一段你认为难度适当的AT&T格式X86汇编代码，尝试解释其含义。
+```
+.text
+.globl __alltraps
+__alltraps:
+    # push registers to build a trap frame
+    # therefore make the stack look like a struct trapframe
+    pushl %ds
+    pushl %es
+    pushl %fs
+    pushl %gs
+    pushal
+
+    # load GD_KDATA into %ds and %es to set up data segments for kernel
+    movl $GD_KDATA, %eax
+    movw %ax, %ds
+    movw %ax, %es
+
+    # push %esp to pass a pointer to the trapframe as an argument to trap()
+    pushl %esp
+
+    # call trap(tf), where tf=%esp
+    call trap
+
+    # pop the pushed stack pointer
+    popl %esp
+
+    # return falls through to trapret...
+.globl __trapret
+__trapret:
+    # restore registers from stack
+    popal
+
+    # restore %ds, %es, %fs and %gs
+    popl %gs
+    popl %fs
+    popl %es
+    popl %ds
+
+    # get rid of the trap number and error code
+    addl $0x8, %esp
+    iret
+```
+这段代码用于启动中断。
+
+一开始首先保存中断执行前的几个段的地址，使中断结束后能够让程序回到原来的位置继续执行。然后将一个新的地址作为中断使用的段地址放入段地址的指针。接下来中断之前的段的地址的指针放入栈顶作为trap函数的参数，然后调用trap。调用结束之后恢复中断前的段地址到段寄存器中。
 
 2. (option)请在rcore中找一段你认为难度适当的RV汇编代码，尝试解释其含义。
 
 #### 练习二
 
 宏定义和引用在内核代码中很常用。请枚举ucore或rcore中宏定义的用途，并举例描述其含义。
+`#define TIMER_DIV(x)    ((TIMER_FREQ + (x) / 2) / (x))`
+
+这段宏定义用来计算当计时器每秒计数x次时，系统使用应该多少跳计数一次。
 
 #### reference
  - [Intel格式和AT&T格式汇编区别](http://www.cnblogs.com/hdk1993/p/4820353.html)
