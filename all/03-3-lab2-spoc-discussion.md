@@ -34,13 +34,24 @@ NOTICE
 
 4. 写一个示例程序，完成4个特权级间的函数调用和数据访问时特权级控制的作用。
 
+```c++
+enum AccessType {
+    function_call, data_access
+};
 
+bool access_control(AccessType access_type, int CPL, int DPL) {
+    if (access_type == AccessType::function_call)
+        return CPL >= DPL;
+    else
+        return CPL <= DPL;
+}
+```
 
 ### 7.2 了解特权级切换过程
 
 1. 一条指令在执行时会有哪些可能的特权级判断？
 
-访问代码：需要check 当前特权级是否等于或高于要访问的数据段的DPL。如果是通过段寄存器SS访问数据段，则要求CPL、RPL = DPL
+访问代码：需要check 当前特权级CPL是否>=要访问的数据段的DPL。如果是通过段寄存器SS访问数据段，则要求CPL、RPL <= DPL
 
 2. 在什么情况下会出现特权级切换？
 
@@ -48,13 +59,18 @@ NOTICE
 
 3. int指令在ring0和ring3的执行行为有什么不同？
 
-多了一个SS:ESP的压栈。
+在ring 3调用的时候多了一个SS，ESP的压栈。
 
 4. 如何利用int和iret指令完成不同特权级的切换？
 
-人工构造需要的栈结构，然后通过int和iret指令进行切换。
+- 特权级ring 0到ring 3：人工构造需要的栈结构，包括ring 3的SS、ESP、EFLAGS、CS、EIP、Error code，然后通过iret指令进行切换。
+- 特权级ring 3到ring 0：通过系统调用指令int进入ring 0，然后修改堆栈中的CS，EIP项，让程序结束时在调用iret之后仍然在ring 0执行。
 
 5. TSS和Task Register的作用是什么？
+
+TSS的作用时存放不同的特权级的堆栈信息，包括ring0-2的SS，esp。
+
+Task Register的作用是缓存TSS的内容。
 
  > [Task state segment](https://en.wikipedia.org/wiki/Task_state_segment)
 
@@ -64,7 +80,7 @@ NOTICE
 
 1. 一条指令执行时最多会出现多少次地址转换？
 
-2。
+4
 
 2. 描述X86-32的MMU地址转换过程；
 
