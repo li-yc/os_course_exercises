@@ -68,27 +68,21 @@ CPU利用率随着并发进程数的增加先增加后下降。
 
 1. 缺页率算法的思路？
 
-缺页率是指缺页平均时间间隔的倒数；
-
-思路：保持适度的缺页率。即缺页率过高时增加常驻集；缺页率过低时减少常驻集；
-
-算法：缺页间隔小于等于T时，直接换入需要访问的页面；缺页间隔大于T时，换入需要访问的页面，同时换出没有访问过的页面；
+设置一个时间窗口大小t。每次缺页的时候，如果距离上次缺页间隔不大于t，就将页面加入内存；如果大于t，就先将t时间内未访问的页面移出内存，再将该页面加入内存。
 
 ### 9.7 抖动和负载控制
 
 1. 什么是虚拟内存管理的抖动现象？
 
-抖动现象是指，由于分配给进程的物理页面太少导致频繁置换，从而进程运行速度变慢；
+抖动现象是指分配给进程的物理页面太少，导致频繁缺页，系统花费大量时间处理缺页。
 
 2. 操作系统负载控制的最佳状态是什么状态？
 
-最佳状态是： 平均缺页间隔 = 缺页异常处理时间。
+最佳状态是：每个进程的工作集大小的总和是物理内存大小，而且缺页时间间隔略大于处理缺页所需的时间。
 
 3. 局部置换算法（如FIFO, LRU等）是否能作为全局置换算法来使用？为什么？
 
-局部置换算法不能作为全局置换算法使用；
-
-进程切换会导致进程占用的页面被全部换出
+不能。因为如果采用局部置换算法，进程切换会导致该进程的页面大量被置换出去，局部置换算法不能满足系统进程数的负载均衡的需求。
 
 ## 扩展思考题
 
@@ -98,6 +92,89 @@ CPU利用率随着并发进程数的增加先增加后下降。
 
 3. （spoc）根据你的`学号 mod 4`的结果值，确定选择四种页面置换算法（0：LRU置换算法，1:改进的clock 页置换算法，2：工作集页置换算法，3：缺页率置换算法）中的一种来设计一个应用程序（可基于python, ruby, C, C++，LISP等）模拟实现，并给出测试用例和测试结果。请参考如python代码或独自实现。
  - [页置换算法实现的参考实例](https://github.com/chyyuu/ucore_lab/blob/master/related_info/lab3/page-replacement-policy.py)
+
+```c++
+#include <iostream>
+#include <list>
+#include <memory.h>
+#include <random>
+
+using namespace std;
+
+struct Page {
+    bool valid = 0;
+    int vpn;  // virtual page number
+    int ppn;  // physical page number
+    int last_access_time;
+    
+    bool operator==(Page& page1) {
+        return this->vpn == page1.vpn;
+    }
+};
+
+int last_access_time;
+const int virtual_page_count = 200;
+const int physical_page_count = 100;
+int time_window = 50;
+
+Page page_table[virtual_page_count];
+bool physical_page[physical_page_count];  // 1 means in use, 0 means idle.
+list<int> valid_pages;
+
+void page_fault(int vpn, int time) {
+    if (time - last_access_time > time_window) {
+        int time_bound = time - time_window;
+        valid_pages.remove_if([time_bound](int vpn){
+            if (page_table[vpn].last_access_time < time_bound) {
+                page_table[vpn].valid = false;
+                physical_page[page_table[vpn].ppn] = 0;
+                return true;
+            }
+            return false;
+        });
+    }
+    
+    int ppn=0;
+    while (physical_page[ppn] && ppn < physical_page_count) {
+        ppn++;
+    }
+    if (ppn >= physical_page_count) {
+        fprintf(stderr, "error: all physical pages in use\n");
+        exit(1);
+    }
+    physical_page[ppn] = 1;
+    valid_pages.emplace_back(vpn);
+    page_table[vpn].ppn = ppn;
+    page_table[vpn].valid = 1;
+}
+
+/**
+ * return the physical page number of the page
+ */
+int access_page(int vpn, int time) {
+    if (vpn >= virtual_page_count) {
+        fprintf(stderr, "Segmentation fault (access page larger than virtual memory size)\n");
+        exit(1);
+    }
+    int ppn;
+    if (page_table[vpn].valid) {
+        page_table[vpn].last_access_time = time;
+        ppn = page_table[vpn].ppn;
+    } else {
+        page_fault(vpn, time);
+        page_table[vpn].last_access_time = time;
+        ppn = page_table[vpn].ppn;
+    }
+    last_access_time = time;
+    return ppn;
+}
+
+void init_page_table() {
+    valid_pages.clear();
+    memset(physical_page, 0, sizeof(bool) * physical_page_count);
+    last_access_time = 0;
+}
+```
 
 4. 请判断OPT、LRU、FIFO、Clock和LFU等各页面置换算法是否存在Belady现象？如果存在，给出实例；如果不存在，给出证明。
 
