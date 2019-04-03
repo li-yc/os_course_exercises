@@ -112,6 +112,8 @@ PROC_UNINIT：是否未初始化。PROC_SLEEPING：是否在挂起。PROC_RUNNAB
 
 (2) (spoc)设计一个简化的进程管理子系统，可以管理并调度如下简化进程。在理解[参考代码](https://github.com/chyyuu/ucore_lab/blob/master/related_info/lab4/process-concept-homework.py)的基础上，完成＂YOUR CODE"部分的内容。然后通过测试用例和比较自己的实现与往届同学的结果，评价自己的实现是否正确。可２个人一组。
 
+
+
 ### 进程的状态 
 
  - RUNNING - 进程正在使用CPU
