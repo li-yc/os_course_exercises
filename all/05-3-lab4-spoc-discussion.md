@@ -82,6 +82,8 @@
 
 > 需写练习报告和简单编码，完成后放到git server 对应的git repo中
 
+在文件[lab4-spoc-discuss](lab4-spoc-discuss)中。
+
 ### 掌握知识点
 1. 内核线程的启动、运行、就绪、等待、退出
 2. 内核线程的管理与简单调度
@@ -89,24 +91,55 @@
 
 ### 练习用的[lab4 spoc exercise project source code](https://github.com/chyyuu/ucore_lab/tree/master/related_info/lab4/lab4-spoc-discuss)
 
-
 请完成如下练习，完成代码填写，并形成spoc练习报告
 
 ### 1. 分析并描述创建分配进程的过程
 
 > 注意 state、pid、cr3，context，trapframe的含义
 
+process的分配在proc.c的proc_init()函数和do_fork()函数中。过程如下：
+
+1. 调用alloc_proc()分配一个TCB。其中
+1. 设置`pid=0;`表示进程id是0；`state=PROC_RUNNABLE;`表示进程当前状态是就绪；`kstack=bootstack;`进程的堆栈是内核堆栈；`need_resched=1;`表示进程可以被调度。`set_proc_name("proc_name");`。
+
 ### 练习2：分析并描述新创建的内核线程是如何分配资源的
 
 > 注意 理解对kstack, trapframe, context等的初始化
 
-
 当前进程中唯一，操作系统的整个生命周期不唯一，在get_pid中会循环使用pid，耗尽会等待
+
+1. kstack在setup_kstack()函数中进行初始化，调用`alloc_pages(KSTACKPAGE)`分配KSTACKPAGE个页面作为初始页，然后将这些页面的地址作为kstack。
+
+1. trapframe在copy_thread()函数中初始化。`proc->tf->tf_regs.reg_eax = 0; proc->tf->tf_esp = esp; proc->tf->tf_eflags |= FL_IF;`。
+
+1. context在copy_thread()函数中初始化。`proc->context.eip = (uintptr_t)forkret; proc->context.esp = (uintptr_t)(proc->tf);`。
 
 ### 练习3：
 
 阅读代码，在现有基础上再增加一个内核线程，并通过增加cprintf函数到ucore代码中
 能够把内核线程的生命周期和调度动态执行过程完整地展现出来
+
+原来的代码中有2个内核线程，我仿照原来的内核线程分配方法，增加了第3个内核线程。
+
+```c++
+	int pid1= kernel_thread(init_main, "init main1: Hello world!!", 0);
+    int pid2= kernel_thread(init_main, "init main2: Hello world!!", 0);
+    int pid3= kernel_thread(init_main, "init main3: Hello world!!", 0);
+    if (pid1 <= 0 || pid2<=0 || pid3<=0) {
+        panic("create kernel thread init_main1 or 2 failed.\n");
+    }
+
+    initproc1 = find_proc(pid1);
+	initproc2 = find_proc(pid2);
+	initproc3 = find_proc(pid3);
+    set_proc_name(initproc1, "init1");
+	set_proc_name(initproc2, "init2");
+	set_proc_name(initproc3, "init3");
+    cprintf("proc_init:: Created kernel thread init_main--> pid: %d, name: %s\n",initproc1->pid, initproc1->name);
+	cprintf("proc_init:: Created kernel thread init_main--> pid: %d, name: %s\n",initproc2->pid, initproc2->name);
+	cprintf("proc_init:: Created kernel thread init_main--> pid: %d, name: %s\n",initproc3->pid, initproc3->name);
+    assert(idleproc != NULL && idleproc->pid == 0);
+```
 
 ### 练习4 （非必须，有空就做）：
 
@@ -119,3 +152,7 @@
 ### 思考：
 
 switch_to函数的汇编码与编译器生成的C函数的汇编码区别是什么？能否用C语言实现switch_to函数？为什么？
+
+与编译器生成的汇编码区别在于没有函数调用指令call的情况下使用了ret指令。
+
+不能用C语言实现，因为需要使用push和ret指令让程序跳转到另一个线程的位置继续执行，而且涉及到直接对堆栈和寄存器进行操作，C语言无法实现。
