@@ -47,10 +47,11 @@ get_pid();
 
 1. 试分析wait()和exit()的结果放在什么地方？exit()是在什么时候放进去的？wait()在什么地方取到出的？
 
-放在
+放在%eax中。
 
 2. 试分析ucore操作系统内核是如何把子进程exit()的返回值传递给父进程wait()的？
 
+利用寄存器%eax。
 
 3. 什么是僵尸进程和孤儿进程？
 
@@ -67,6 +68,7 @@ sleep的定时器设置在操作系统内核。
 ## 小组思考题
 
 (1) (spoc)设计一个简化的进程管理子系统，可以管理并调度支持“就绪”和“等待”状态的简化进程。给出了[参考代码](https://github.com/chyyuu/ucore_lab/blob/master/related_info/lab5/process-cpuio-homework.py)，请理解代码，并完成＂YOUR CODE"部分的内容．　可２个人一组
+
 
 ### 进程的状态 
 ```
